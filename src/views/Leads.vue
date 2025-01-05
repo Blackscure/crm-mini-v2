@@ -2,7 +2,6 @@
 import { ref, onMounted } from 'vue';
 import axios from 'axios';
 
-// Define an interface for the Lead type
 interface Lead {
   id: number;
   name: string;
@@ -15,11 +14,12 @@ interface Lead {
 // Reactive references
 const leads = ref<Lead[]>([]); // To store leads
 const newLead = ref({
+  id: null,
   name: '',
   email: '',
   phone: '',
   created_by: '',
-}); // To add a new lead
+}); // To add or edit a lead
 const loading = ref(false); // Loading state
 
 // Pagination state
@@ -72,44 +72,76 @@ const fetchLeads = async (page = 1) => {
   }
 };
 
-// Function to add a new lead
-const addLead = async () => {
+// Function to add or edit a lead
+const saveLead = async () => {
   const token = localStorage.getItem('access_token');
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const userId = user ? user.id : null;
 
   if (!token || !userId) {
-    alert('You must be logged in to add a lead.');
+    alert('You must be logged in to add or edit a lead.');
     return;
   }
 
   loading.value = true;
   try {
-    const response = await axios.post(
-      'http://127.0.0.1:8000/apps/crm-mini/api/v1/lead/leads/',
-      {
-        name: newLead.value.name,
-        email: newLead.value.email,
-        phone: newLead.value.phone,
-        created_by: userId,
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
+    let response;
+    if (newLead.value.id) {
+      // Edit existing lead (PUT request)
+      response = await axios.put(
+        `http://127.0.0.1:8000/apps/crm-mini/api/v1/lead/leads/${newLead.value.id}/`,
+        {
+          name: newLead.value.name,
+          email: newLead.value.email,
+          phone: newLead.value.phone,
+          created_by: userId,
         },
-      }
-    );
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+    } else {
+      // Add new lead (POST request)
+      response = await axios.post(
+        'http://127.0.0.1:8000/apps/crm-mini/api/v1/lead/leads/',
+        {
+          name: newLead.value.name,
+          email: newLead.value.email,
+          phone: newLead.value.phone,
+          created_by: userId,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+    }
 
-    leads.value.push({
-      id: response.data.id,
-      ...newLead.value,
-      created_by: userId,
-      created_at: new Date().toISOString(),
-    });
+    // Update leads list after saving
+    if (newLead.value.id) {
+      // Edit case
+      const index = leads.value.findIndex((lead) => lead.id === newLead.value.id);
+      if (index !== -1) {
+        leads.value[index] = { ...response.data, created_by: userId, created_at: new Date().toISOString() };
+      }
+    } else {
+      // Add case
+      leads.value.push({
+        id: response.data.id,
+        ...newLead.value,
+        created_by: userId,
+        created_at: new Date().toISOString(),
+      });
+    }
 
     // Reset the form
     newLead.value = {
+      id: null,
       name: '',
       email: '',
       phone: '',
@@ -118,13 +150,18 @@ const addLead = async () => {
 
     fetchLeads(currentPage.value);
 
-    console.log('Lead created successfully:', response.data);
+    console.log(newLead.value.id ? 'Lead updated successfully' : 'Lead created successfully:', response.data);
   } catch (error) {
-    console.error('Error creating lead:', error);
-    alert('Failed to create lead. Please try again.');
+    console.error('Error saving lead:', error);
+    alert('Failed to save lead. Please try again.');
   } finally {
     loading.value = false;
   }
+};
+
+// Function to edit an existing lead
+const editLead = (lead: Lead) => {
+  newLead.value = { ...lead }; // Populate the form with the selected lead's data
 };
 
 // Function to delete a lead locally
@@ -138,25 +175,45 @@ onMounted(() => fetchLeads());
 
 <template>
   <div class="space-y-6">
-    <!-- Add Lead Form -->
+    <!-- Add/Edit Lead Form -->
     <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-      <h2 class="text-2xl font-bold mb-4 text-gray-900 dark:text-white">Add New Lead</h2>
-      <form @submit.prevent="addLead" class="space-y-4">
+      <h2 class="text-2xl font-bold mb-4 text-gray-900 dark:text-white">
+        {{ newLead.id ? 'Edit Lead' : 'Add New Lead' }}
+      </h2>
+      <form @submit.prevent="saveLead" class="space-y-4">
         <div>
           <label for="name" class="label">Name</label>
-          <input id="name" v-model="newLead.name" type="text" required class="input" />
+          <input
+            id="name"
+            v-model="newLead.name"
+            type="text"
+            required
+            class="input"
+          />
         </div>
         <div>
           <label for="email" class="label">Email</label>
-          <input id="email" v-model="newLead.email" type="email" required class="input" />
+          <input
+            id="email"
+            v-model="newLead.email"
+            type="email"
+            required
+            class="input"
+          />
         </div>
         <div>
           <label for="phone" class="label">Phone</label>
-          <input id="phone" v-model="newLead.phone" type="tel" required class="input" />
+          <input
+            id="phone"
+            v-model="newLead.phone"
+            type="tel"
+            required
+            class="input"
+          />
         </div>
         <button type="submit" class="btn btn-primary" :disabled="loading.value">
           <span v-if="loading.value">Loading...</span>
-          <span v-else>Add Lead</span>
+          <span v-else>{{ newLead.id ? 'Save Changes' : 'Add Lead' }}</span>
         </button>
       </form>
     </div>
@@ -184,35 +241,25 @@ onMounted(() => fetchLeads());
                 <td class="px-6 py-4 whitespace-nowrap text-gray-900 dark:text-white">{{ lead.phone }}</td>
                 <td class="px-6 py-4 whitespace-nowrap text-gray-900 dark:text-white">{{ lead.created_by }}</td>
                 <td class="px-6 py-4 whitespace-nowrap text-gray-900 dark:text-white">{{ formatDate(lead.created_at) }}</td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                  <button @click="deleteLead(lead.id)" class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300">
-                    Delete
-                  </button>
+                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                  <button @click="editLead(lead)" class="text-indigo-600 hover:text-indigo-900">Edit</button>
+                  <button @click="deleteLead(lead.id)" class="text-red-600 hover:text-red-900 ml-2">Delete</button>
                 </td>
               </tr>
             </tbody>
           </table>
         </div>
+        <!-- Pagination -->
+        <div class="mt-4">
+          <button @click="fetchLeads(currentPage.value - 1)" :disabled="currentPage.value === 1" class="btn btn-secondary">
+            Previous
+          </button>
+          <span class="mx-2">{{ currentPage.value }} of {{ totalPages.value }}</span>
+          <button @click="fetchLeads(currentPage.value + 1)" :disabled="currentPage.value === totalPages.value" class="btn btn-secondary">
+            Next
+          </button>
+        </div>
       </div>
-    </div>
-
-    <!-- Pagination Controls -->
-    <div class="flex justify-between items-center p-6">
-      <button
-        :disabled="currentPage === 1"
-        @click="fetchLeads(currentPage - 1)"
-        class="btn btn-secondary"
-      >
-        Previous
-      </button>
-      <span class="text-gray-700 dark:text-gray-200">Page {{ currentPage }} of {{ totalPages }}</span>
-      <button
-        :disabled="currentPage === totalPages"
-        @click="fetchLeads(currentPage + 1)"
-        class="btn btn-secondary"
-      >
-        Next
-      </button>
     </div>
   </div>
 </template>
