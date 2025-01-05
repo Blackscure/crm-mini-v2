@@ -21,6 +21,7 @@ interface Lead {
 }
 
 const contacts = ref<Contact[]>([]);
+console.log('===================> contact', contacts)
 const newContact = ref<Contact>({
   id: 0,
   name: '',
@@ -43,48 +44,56 @@ const fetchLeadsFromLocalStorage = () => {
   }
 };
 
-const formatDate = (dateString: string): string => {
-  const date = new Date(dateString);
-  return new Intl.DateTimeFormat('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: true,
-  }).format(date);
-};
+
 
 const fetchContacts = async (page = 1) => {
   const token = localStorage.getItem('access_token');
+
   if (!token) {
     alert('No access token found. Please log in.');
     return;
   }
 
+  // Set loading state
   loading.value = true;
+
   try {
+    // Make the API call
     const response = await axios.get(
       `http://127.0.0.1:8000/apps/crm-mini/api/v1/contact/contacts/?page=${page}`,
       {
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${token}`, // Authorization header
         },
       }
     );
 
+    // Parse response data
     const responseData = response.data;
-    contacts.value = responseData.data.data;
-    currentPage.value = responseData.current_page;
-    totalPages.value = responseData.pages;
+
+    // Ensure response data has the expected structure
+    if (responseData && responseData.data && Array.isArray(responseData.data)) {
+      contacts.value = responseData.data; // Set contacts data
+      currentPage.value = responseData.current_page || 1;
+      totalPages.value = responseData.pages || 1;
+
+      console.log('Fetched contacts:', contacts.value); // Debug log
+    } else {
+      console.error('Unexpected response structure:', responseData);
+      alert('Failed to fetch contacts. Please try again.');
+    }
+
   } catch (error) {
-    console.error('Error fetching leads:', error);
-    alert('Failed to fetch leads. Please check the token and API.');
+    console.error('Error fetching contacts:', error);
+    alert('An error occurred while fetching contacts. Please check your connection and try again.');
   } finally {
+    // Reset loading state
     loading.value = false;
   }
 };
+
+
+
 
 const saveContact = async () => {
   const token = localStorage.getItem('access_token');
@@ -172,7 +181,7 @@ const deleteContact = (id: number) => {
 
 onMounted(() => {
   fetchContacts();
-  fetchLeadsFromLocalStorage(); // Fetch leads from localStorage
+  fetchLeadsFromLocalStorage(); 
 });
 </script>
 
@@ -257,7 +266,7 @@ onMounted(() => {
                 <td class="px-6 py-4 whitespace-nowrap text-gray-900 dark:text-white">
                   {{ contact.lead?.name || 'N/A' }}
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap text-gray-900 dark:text-white">{{ formatDate(contact.created_at) }}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-gray-900 dark:text-white">{{ created_at }}</td>
                 <td class="px-6 py-4 whitespace-nowrap text-gray-900 dark:text-white">
                   <button @click="editContact(contact)" class="text-blue-500 hover:text-blue-700">Edit</button>
                   <button @click="deleteContact(contact.id)" class="ml-2 text-red-500 hover:text-red-700">Delete</button>
