@@ -36,11 +36,38 @@ const fetchLeadsFromLocalStorage = () => {
 
 const fetchNotes = async () => {
   isLoading.value = true;
+  const token = localStorage.getItem('access_token'); // Retrieve token from localStorage
+  if (!token) {
+    showToast('Token not found', 'error');
+    isLoading.value = false;
+    return;
+  }
+
   try {
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    // Simulated data fetch
+    const response = await fetch('http://127.0.0.1:8000/apps/crm-mini/api/v1/note/notes/', {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`, // Use Bearer token for authentication
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to load notes');
+    }
+
+    const data = await response.json();
+    if (data.status) {
+      notes.value = data.data.map((note: any) => ({
+        id: note.id,
+        leadId: note.lead,
+        content: note.content,
+        createdAt: note.created_at,
+      }));
+    } else {
+      showToast(data.message, 'error');
+    }
   } catch (error) {
-    showToast('Failed to load notes', 'error');
+    showToast(error.message || 'Failed to load notes', 'error');
   } finally {
     isLoading.value = false;
   }
@@ -234,3 +261,7 @@ onMounted(() => {
     </div>
   </div>
 </template>
+
+<style scoped>
+/* Add your custom styles if needed */
+</style>
