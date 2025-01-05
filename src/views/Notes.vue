@@ -46,19 +46,44 @@ const fetchNotes = async () => {
   }
 };
 
+// Add Note with API call
 const addNote = async () => {
   isSaving.value = true;
+  const token = localStorage.getItem('access_token'); // Retrieve token from localStorage
+  if (!token) {
+    showToast('Token not found', 'error');
+    isSaving.value = false;
+    return;
+  }
+
   try {
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    const response = await fetch('http://127.0.0.1:8000/apps/crm-mini/api/v1/note/notes/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`, // Use Bearer token for authentication
+      },
+      body: JSON.stringify({
+        lead: newNote.value.leadId,  // Use leadId for the lead
+        content: newNote.value.content,  // Content of the note
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to add note');
+    }
+
+    const data = await response.json();
     notes.value.push({
-      id: Date.now(),
-      ...newNote.value,
+      id: data.id,  // Assuming the API responds with the note ID
+      leadId: newNote.value.leadId,
+      content: newNote.value.content,
       createdAt: new Date().toISOString(),
     });
     showToast('Note added successfully');
     resetForm();
   } catch (error) {
-    showToast('Failed to add note', 'error');
+    showToast(error.message || 'Failed to add note', 'error');
   } finally {
     isSaving.value = false;
   }
