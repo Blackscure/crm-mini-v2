@@ -22,6 +22,10 @@ const newLead = ref({
 }); // To add a new lead
 const loading = ref(false); // Loading state
 
+// Pagination state
+const currentPage = ref(1);
+const totalPages = ref(1);
+
 const formatDate = (dateString: string): string => {
   const date = new Date(dateString);
   return new Intl.DateTimeFormat('en-US', {
@@ -35,8 +39,8 @@ const formatDate = (dateString: string): string => {
   }).format(date);
 };
 
-// Function to fetch leads from the API
-const fetchLeads = async () => {
+// Function to fetch leads from the API with pagination
+const fetchLeads = async (page = 1) => {
   const token = localStorage.getItem('access_token');
   if (!token) {
     alert('No access token found. Please log in.');
@@ -45,14 +49,20 @@ const fetchLeads = async () => {
 
   loading.value = true;
   try {
-    const response = await axios.get('http://127.0.0.1:8000/apps/crm-mini/api/v1/lead/leads/', {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
+    const response = await axios.get(
+      `http://127.0.0.1:8000/apps/crm-mini/api/v1/lead/leads/?page=${page}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
 
-    // Access the leads in the nested response
-    leads.value = response.data.data.data; // The array of leads
+    const responseData = response.data;
+    leads.value = responseData.data.data;
+    currentPage.value = responseData.current_page;
+    totalPages.value = responseData.pages;
+
     console.log('Fetched leads:', leads.value);
   } catch (error) {
     console.error('Error fetching leads:', error);
@@ -106,6 +116,8 @@ const addLead = async () => {
       created_by: '',
     };
 
+    fetchLeads(currentPage.value);
+
     console.log('Lead created successfully:', response.data);
   } catch (error) {
     console.error('Error creating lead:', error);
@@ -121,7 +133,7 @@ const deleteLead = (id: number) => {
 };
 
 // Fetch leads when the component is mounted
-onMounted(fetchLeads);
+onMounted(() => fetchLeads());
 </script>
 
 <template>
@@ -170,11 +182,8 @@ onMounted(fetchLeads);
                 <td class="px-6 py-4 whitespace-nowrap text-gray-900 dark:text-white">{{ lead.name }}</td>
                 <td class="px-6 py-4 whitespace-nowrap text-gray-900 dark:text-white">{{ lead.email }}</td>
                 <td class="px-6 py-4 whitespace-nowrap text-gray-900 dark:text-white">{{ lead.phone }}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-gray-900 dark:text-white">
-                  {{ formatDate(lead.created_at) }}
-                </td>
-                
-                <td class="px-6 py-4 whitespace-nowrap text-gray-900 dark:text-white">{{ lead.created_at }}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-gray-900 dark:text-white">{{ lead.created_by }}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-gray-900 dark:text-white">{{ formatDate(lead.created_at) }}</td>
                 <td class="px-6 py-4 whitespace-nowrap">
                   <button @click="deleteLead(lead.id)" class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300">
                     Delete
@@ -185,6 +194,25 @@ onMounted(fetchLeads);
           </table>
         </div>
       </div>
+    </div>
+
+    <!-- Pagination Controls -->
+    <div class="flex justify-between items-center p-6">
+      <button
+        :disabled="currentPage === 1"
+        @click="fetchLeads(currentPage - 1)"
+        class="btn btn-secondary"
+      >
+        Previous
+      </button>
+      <span class="text-gray-700 dark:text-gray-200">Page {{ currentPage }} of {{ totalPages }}</span>
+      <button
+        :disabled="currentPage === totalPages"
+        @click="fetchLeads(currentPage + 1)"
+        class="btn btn-secondary"
+      >
+        Next
+      </button>
     </div>
   </div>
 </template>
