@@ -1,44 +1,72 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
-import { useToast } from '../composables/useToast';
-import { PencilIcon, TrashIcon } from '@heroicons/vue/24/outline';
-import LoadingSpinner from '../components/LoadingSpinner.vue';
-import EmptyState from '../components/EmptyState.vue';
+import { ref, onMounted } from 'vue';
 import axios from 'axios';
 
 interface Contact {
   id: number;
-  leadId: number;
   name: string;
   email: string;
   phone: string;
+  lead: string;
+  created_at: string;
 }
 
-const { showToast } = useToast();
+interface Lead {
+  id: number;
+  name: string;
+  email: string;
+  phone: string;
+  created_by: string;
+  created_at: string;
+}
+
 const contacts = ref<Contact[]>([]);
-const newContact = ref({
-  leadId: 0,
+const newContact = ref<Contact>({
+  id: 0,
   name: '',
   email: '',
   phone: '',
+  lead: '',
+  created_at: '',
 });
 
-const editingContact = ref<Contact | null>(null);
-const isEditing = computed(() => !!editingContact.value);
-const isLoading = ref(false);
-const isSaving = ref(false);
+const leads = ref<Lead[]>([]);
+const loading = ref(false);
+const currentPage = ref(1);
+const totalPages = ref(1);
 
-const fetchContacts = async () => {
-  isLoading.value = true;
+// Fetch leads from localStorage
+const fetchLeadsFromLocalStorage = () => {
+  const leadsData = localStorage.getItem('leads');
+  if (leadsData) {
+    leads.value = JSON.parse(leadsData);
+  }
+};
+
+const formatDate = (dateString: string): string => {
+  const date = new Date(dateString);
+  return new Intl.DateTimeFormat('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true,
+  }).format(date);
+};
+
+const fetchContacts = async (page = 1) => {
+  const token = localStorage.getItem('access_token');
+  if (!token) {
+    alert('No access token found. Please log in.');
+    return;
+  }
+
+  loading.value = true;
   try {
-    const token = localStorage.getItem('access_token');
-    if (!token) {
-      alert('No access token found. Please log in.');
-      return;
-    }
-
     const response = await axios.get(
-      `http://127.0.0.1:8000/api/contacts`,
+      `http://127.0.0.1:8000/apps/crm-mini/api/v1/contact/contacts/?page=${page}`,
       {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -46,102 +74,115 @@ const fetchContacts = async () => {
       }
     );
 
-    contacts.value = response.data.data;
+    const responseData = response.data;
+    contacts.value = responseData.data.data;
+    currentPage.value = responseData.current_page;
+    totalPages.value = responseData.pages;
   } catch (error) {
-    showToast('Failed to load contacts', 'error');
+    console.error('Error fetching leads:', error);
+    alert('Failed to fetch leads. Please check the token and API.');
   } finally {
-    isLoading.value = false;
+    loading.value = false;
   }
 };
 
-const addContact = async () => {
-  isSaving.value = true;
-  try {
-    const token = localStorage.getItem('access_token');
-    const response = await axios.post(
-      `http://127.0.0.1:8000/api/contacts`,
-      newContact.value,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      }
-    );
-    contacts.value.push(response.data);
-    showToast('Contact added successfully');
-    resetForm();
-  } catch (error) {
-    showToast('Failed to add contact', 'error');
-  } finally {
-    isSaving.value = false;
+const saveContact = async () => {
+  const token = localStorage.getItem('access_token');
+  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const userId = user ? user.id : null;
+
+  if (!token || !userId) {
+    alert('You must be logged in to add or edit a lead.');
+    return;
   }
-};
 
-const updateContact = async () => {
-  if (!editingContact.value) return;
-
-  isSaving.value = true;
+  loading.value = true;
   try {
-    const token = localStorage.getItem('access_token');
-    const response = await axios.put(
-      `http://127.0.0.1:8000/api/contacts/${editingContact.value.id}`,
-      newContact.value,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      }
-    );
+    let response;
+    const payload = {
+      name: newContact.value.name,
+      email: newContact.value.email,
+      phone: newContact.value.phone,
+      lead: newContact.value.lead, // Use the selected lead ID
+    };
 
-    const index = contacts.value.findIndex(
-      (contact) => contact.id === editingContact.value.id
-    );
-    if (index !== -1) {
-      contacts.value[index] = response.data;
+    if (newContact.value.id) {
+      response = await axios.put(
+        `http://127.0.0.1:8000/apps/crm-mini/api/v1/contact/contacts/${newContact.value.id}/`,
+        payload,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+    } else {
+      response = await axios.post(
+        'http://127.0.0.1:8000/apps/crm-mini/api/v1/contact/contacts/',
+        payload,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
     }
-    showToast('Contact updated successfully');
-    resetForm();
+
+    if (newContact.value.id) {
+      const index = contacts.value.findIndex((contact) => contact.id === newContact.value.id);
+      if (index !== -1) {
+        contacts.value[index] = { ...response.data, created_by: userId, created_at: new Date().toISOString() };
+      }
+    } else {
+      contacts.value.push({
+        id: response.data.id,
+        ...newContact.value,
+        lead: newContact.value.lead, // Set the lead dynamically
+        created_at: new Date().toISOString(),
+      });
+    }
+
+    // Reset the form
+    newContact.value = {
+      id: 0,
+      name: '',
+      email: '',
+      phone: '',
+      lead: '',
+      created_at: '',
+    };
+
+    fetchContacts(currentPage.value);
   } catch (error) {
-    showToast('Failed to update contact', 'error');
+    alert('Failed to save contact. Please try again.');
   } finally {
-    isSaving.value = false;
+    loading.value = false;
   }
 };
 
-const deleteContact = async (id: number) => {
-  try {
-    const token = localStorage.getItem('access_token');
-    await axios.delete(`http://127.0.0.1:8000/api/contacts/${id}`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-    contacts.value = contacts.value.filter((contact) => contact.id !== id);
-    showToast('Contact deleted successfully');
-  } catch (error) {
-    showToast('Failed to delete contact', 'error');
-  }
+const editContact = (contact: Contact) => {
+  newContact.value = { ...contact };
 };
 
-const resetForm = () => {
-  newContact.value = { leadId: 0, name: '', email: '', phone: '' };
-  editingContact.value = null;
+const deleteContact = (id: number) => {
+  contacts.value = contacts.value.filter((contact) => contact.id !== id);
 };
 
-// Fetch contacts when the component is mounted
-onMounted(fetchContacts);
+onMounted(() => {
+  fetchContacts();
+  fetchLeadsFromLocalStorage(); // Fetch leads from localStorage
+});
 </script>
 
 <template>
-  <div class="space-y-6 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-    <!-- Add/Edit Contact Form -->
+  <div class="space-y-6">
     <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
       <h2 class="text-2xl font-bold mb-4 text-gray-900 dark:text-white">
-        {{ isEditing ? 'Edit Contact' : 'Add New Contact' }}
+        {{ newContact.id ? 'Edit Contact' : 'Add New Contact' }}
       </h2>
-      <form @submit.prevent="isEditing ? updateContact() : addContact()" class="space-y-4">
+      <form @submit.prevent="saveContact" class="space-y-4">
         <div>
           <label for="name" class="label">Name</label>
           <input
@@ -172,41 +213,39 @@ onMounted(fetchContacts);
             class="input"
           />
         </div>
-        <div class="flex space-x-4">
-          <button 
-            type="submit" 
-            class="btn btn-primary flex items-center"
-            :disabled="isSaving"
+        <div>
+          <label for="lead" class="label">Lead</label>
+          <select
+            id="lead"
+            v-model="newContact.lead"
+            class="input"
+            required
           >
-            <LoadingSpinner v-if="isSaving" class="mr-2" />
-            {{ isEditing ? 'Update Contact' : 'Add Contact' }}
-          </button>
-          <button 
-            v-if="isEditing" 
-            type="button" 
-            @click="resetForm"
-            class="btn bg-gray-500 text-white hover:bg-gray-600"
-            :disabled="isSaving"
-          >
-            Cancel
-          </button>
+            <option v-for="lead in leads" :key="lead.id" :value="lead.id">
+              {{ lead.name }}
+            </option>
+          </select>
         </div>
+        <button type="submit" class="btn btn-primary" :disabled="loading.value">
+          <span v-if="loading.value">Loading...</span>
+          <span v-else>{{ newContact.id ? 'Save Changes' : 'Add Lead' }}</span>
+        </button>
       </form>
     </div>
 
-    <!-- Contacts List -->
+    <!-- Contacts Table -->
     <div class="bg-white dark:bg-gray-800 rounded-lg shadow">
       <div class="p-6">
         <h2 class="text-2xl font-bold mb-4 text-gray-900 dark:text-white">Contacts</h2>
-        <LoadingSpinner v-if="isLoading" />
-        <EmptyState v-else-if="contacts.length === 0" message="No contacts found. Add your first contact above." />
-        <div v-else class="overflow-x-auto">
+        <div class="overflow-x-auto">
           <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
             <thead>
               <tr>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Name</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Email</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Phone</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Lead</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Created At</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
@@ -216,14 +255,12 @@ onMounted(fetchContacts);
                 <td class="px-6 py-4 whitespace-nowrap text-gray-900 dark:text-white">{{ contact.email }}</td>
                 <td class="px-6 py-4 whitespace-nowrap text-gray-900 dark:text-white">{{ contact.phone }}</td>
                 <td class="px-6 py-4 whitespace-nowrap text-gray-900 dark:text-white">
-                  <button @click="editContact(contact)" class="text-blue-500 hover:text-blue-700">
-                    <PencilIcon class="h-5 w-5 inline-block mr-2" />
-                    Edit
-                  </button>
-                  <button @click="deleteContact(contact.id)" class="text-red-500 hover:text-red-700">
-                    <TrashIcon class="h-5 w-5 inline-block mr-2" />
-                    Delete
-                  </button>
+                  {{ contact.lead?.name || 'N/A' }}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-gray-900 dark:text-white">{{ formatDate(contact.created_at) }}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-gray-900 dark:text-white">
+                  <button @click="editContact(contact)" class="text-blue-500 hover:text-blue-700">Edit</button>
+                  <button @click="deleteContact(contact.id)" class="ml-2 text-red-500 hover:text-red-700">Delete</button>
                 </td>
               </tr>
             </tbody>
@@ -231,5 +268,24 @@ onMounted(fetchContacts);
         </div>
       </div>
     </div>
+
+    <!-- Pagination -->
+    <div class="flex justify-between p-6">
+      <button
+        @click="fetchContacts(currentPage.value - 1)"
+        :disabled="currentPage.value === 1"
+        class="btn btn-secondary"
+      >
+        Previous
+      </button>
+      <button
+        @click="fetchContacts(currentPage.value + 1)"
+        :disabled="currentPage.value === totalPages.value"
+        class="btn btn-secondary"
+      >
+        Next
+      </button>
+    </div>
   </div>
 </template>
+

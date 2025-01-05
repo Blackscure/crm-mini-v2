@@ -63,6 +63,9 @@ const fetchLeads = async (page = 1) => {
     currentPage.value = responseData.current_page;
     totalPages.value = responseData.pages;
 
+    // Save the leads in localStorage
+    localStorage.setItem('leads', JSON.stringify(leads.value));
+
     console.log('Fetched leads:', leads.value);
   } catch (error) {
     console.error('Error fetching leads:', error);
@@ -71,6 +74,7 @@ const fetchLeads = async (page = 1) => {
     loading.value = false;
   }
 };
+
 
 // Function to add or edit a lead
 const saveLead = async () => {
