@@ -116,6 +116,7 @@ const addNote = async () => {
   }
 };
 
+// Start Edit for a Note
 const startEdit = (note: Note) => {
   editingNote.value = note;
   newNote.value = {
@@ -124,38 +125,82 @@ const startEdit = (note: Note) => {
   };
 };
 
+// Update Note with PUT request
 const updateNote = async () => {
   if (!editingNote.value) return;
 
   isSaving.value = true;
+  const token = localStorage.getItem('access_token');
+  if (!token) {
+    showToast('Token not found', 'error');
+    isSaving.value = false;
+    return;
+  }
+
   try {
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    const index = notes.value.findIndex(n => n.id === editingNote.value?.id);
+    const response = await fetch(`http://127.0.0.1:8000/apps/crm-mini/api/v1/note/notes/${editingNote.value.id}/`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        lead: newNote.value.leadId,
+        content: newNote.value.content,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to update note');
+    }
+
+    const data = await response.json();
+    const index = notes.value.findIndex(n => n.id === editingNote.value.id);
     if (index !== -1) {
       notes.value[index] = {
-        ...notes.value[index],
-        ...newNote.value,
+        id: data.id,
+        leadId: newNote.value.leadId,
+        content: newNote.value.content,
+        createdAt: new Date().toISOString(),
       };
     }
     showToast('Note updated successfully');
     resetForm();
   } catch (error) {
-    showToast('Failed to update note', 'error');
+    showToast(error.message || 'Failed to update note', 'error');
   } finally {
     isSaving.value = false;
   }
 };
 
+// Delete Note with DELETE request
 const deleteNote = async (id: number) => {
+  const token = localStorage.getItem('access_token');
+  if (!token) {
+    showToast('Token not found', 'error');
+    return;
+  }
+
   try {
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    const response = await fetch(`http://127.0.0.1:8000/apps/crm-mini/api/v1/note/notes/${id}/`, {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to delete note');
+    }
+
     notes.value = notes.value.filter(note => note.id !== id);
     showToast('Note deleted successfully');
   } catch (error) {
-    showToast('Failed to delete note', 'error');
+    showToast(error.message || 'Failed to delete note', 'error');
   }
 };
 
+// Reset the form after adding or editing a note
 const resetForm = () => {
   editingNote.value = null;
   newNote.value = { leadId: 0, content: '' };
@@ -231,30 +276,20 @@ onMounted(() => {
           message="No notes found. Add your first note above."
         />
         
-        <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <div v-for="note in notes" :key="note.id" 
-               class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border dark:border-gray-700">
-            <div class="flex justify-between items-start mb-4">
-              <div>
-                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
-                  {{ getLeadName(note.leadId) }}
-                </h3>
-                <p class="text-sm text-gray-500 dark:text-gray-400">
-                  {{ new Date(note.createdAt).toLocaleDateString() }}
-                </p>
-              </div>
-              <div class="flex space-x-2">
-                <button @click="startEdit(note)" 
-                        class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300">
+        <div v-else class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          <div v-for="note in notes" :key="note.id" class="bg-white dark:bg-gray-700 shadow rounded-lg p-4">
+            <p class="text-sm text-gray-600 dark:text-gray-300">{{ note.content }}</p>
+            <div class="mt-4 flex justify-between items-center">
+              <span class="text-xs text-gray-500 dark:text-gray-400">{{ getLeadName(note.leadId) }}</span>
+              <div class="flex space-x-4">
+                <button @click="startEdit(note)" class="text-blue-500 hover:text-blue-600">
                   <PencilIcon class="h-5 w-5" />
                 </button>
-                <button @click="deleteNote(note.id)" 
-                        class="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300">
+                <button @click="deleteNote(note.id)" class="text-red-500 hover:text-red-600">
                   <TrashIcon class="h-5 w-5" />
                 </button>
               </div>
             </div>
-            <p class="text-gray-600 dark:text-gray-300">{{ note.content }}</p>
           </div>
         </div>
       </div>
@@ -262,6 +297,3 @@ onMounted(() => {
   </div>
 </template>
 
-<style scoped>
-/* Add your custom styles if needed */
-</style>
