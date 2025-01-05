@@ -7,6 +7,10 @@ import Contacts from '../views/Contacts.vue'
 import Notes from '../views/Notes.vue'
 import Reminders from '../views/Reminders.vue'
 
+function isAuthenticated() {
+  return !!localStorage.getItem('access_token'); 
+}
+
 const router = createRouter({
   history: createWebHistory(),
   routes: [
@@ -21,9 +25,22 @@ const router = createRouter({
         { path: 'contacts', component: Contacts },
         { path: 'notes', component: Notes },
         { path: 'reminders', component: Reminders }
-      ]
+      ],
+      meta: { requiresAuth: true }
     }
   ]
 })
 
-export default router
+router.beforeEach((to, from, next) => {
+  if (to.matched.some(record => record.meta.requiresAuth)) {
+    if (!isAuthenticated()) {
+      next('/login');
+    } else {
+      next(); 
+    }
+  } else {
+    next();
+  }
+});
+
+export default router;
