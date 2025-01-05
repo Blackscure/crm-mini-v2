@@ -1,115 +1,123 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { useLeads } from '../composables/useLeads'
-import { useToast } from '../composables/useToast'
-import { PencilIcon, TrashIcon } from '@heroicons/vue/24/outline'
-import LoadingSpinner from '../components/LoadingSpinner.vue'
-import EmptyState from '../components/EmptyState.vue'
+import { ref, computed, onMounted } from 'vue';
+import { useToast } from '../composables/useToast';
+import { PencilIcon, TrashIcon } from '@heroicons/vue/24/outline';
+import LoadingSpinner from '../components/LoadingSpinner.vue';
+import EmptyState from '../components/EmptyState.vue';
 
 interface Note {
-  id: number
-  leadId: number
-  content: string
-  createdAt: string
+  id: number;
+  leadId: number;
+  content: string;
+  createdAt: string;
 }
 
-const { leads } = useLeads()
-const { showToast } = useToast()
-const notes = ref<Note[]>([])
-const editingNote = ref<Note | null>(null)
-const isEditing = computed(() => !!editingNote.value)
-const isLoading = ref(false)
-const isSaving = ref(false)
+interface Lead {
+  id: number;
+  name: string;
+}
 
-const newNote = ref({
-  leadId: 0,
-  content: ''
-})
+const { showToast } = useToast();
+const notes = ref<Note[]>([]);
+const editingNote = ref<Note | null>(null);
+const isEditing = computed(() => !!editingNote.value);
+const isLoading = ref(false);
+const isSaving = ref(false);
+const newNote = ref({ leadId: 0, content: '' });
+const leads = ref<Lead[]>([]);
+
+// Fetch leads from localStorage
+const fetchLeadsFromLocalStorage = () => {
+  const leadsData = localStorage.getItem('leads');
+  if (leadsData) {
+    leads.value = JSON.parse(leadsData);
+  }
+};
 
 const fetchNotes = async () => {
-  isLoading.value = true
+  isLoading.value = true;
   try {
-    await new Promise(resolve => setTimeout(resolve, 1000))
+    await new Promise(resolve => setTimeout(resolve, 1000));
     // Simulated data fetch
   } catch (error) {
-    showToast('Failed to load notes', 'error')
+    showToast('Failed to load notes', 'error');
   } finally {
-    isLoading.value = false
+    isLoading.value = false;
   }
-}
+};
 
 const addNote = async () => {
-  isSaving.value = true
+  isSaving.value = true;
   try {
-    await new Promise(resolve => setTimeout(resolve, 1000))
+    await new Promise(resolve => setTimeout(resolve, 1000));
     notes.value.push({
       id: Date.now(),
       ...newNote.value,
-      createdAt: new Date().toISOString()
-    })
-    showToast('Note added successfully')
-    resetForm()
+      createdAt: new Date().toISOString(),
+    });
+    showToast('Note added successfully');
+    resetForm();
   } catch (error) {
-    showToast('Failed to add note', 'error')
+    showToast('Failed to add note', 'error');
   } finally {
-    isSaving.value = false
+    isSaving.value = false;
   }
-}
+};
 
 const startEdit = (note: Note) => {
-  editingNote.value = note
+  editingNote.value = note;
   newNote.value = {
     leadId: note.leadId,
-    content: note.content
-  }
-}
+    content: note.content,
+  };
+};
 
 const updateNote = async () => {
-  if (!editingNote.value) return
-  
-  isSaving.value = true
+  if (!editingNote.value) return;
+
+  isSaving.value = true;
   try {
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    const index = notes.value.findIndex(n => n.id === editingNote.value?.id)
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    const index = notes.value.findIndex(n => n.id === editingNote.value?.id);
     if (index !== -1) {
       notes.value[index] = {
         ...notes.value[index],
-        ...newNote.value
-      }
+        ...newNote.value,
+      };
     }
-    showToast('Note updated successfully')
-    resetForm()
+    showToast('Note updated successfully');
+    resetForm();
   } catch (error) {
-    showToast('Failed to update note', 'error')
+    showToast('Failed to update note', 'error');
   } finally {
-    isSaving.value = false
+    isSaving.value = false;
   }
-}
+};
 
 const deleteNote = async (id: number) => {
   try {
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    notes.value = notes.value.filter(note => note.id !== id)
-    showToast('Note deleted successfully')
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    notes.value = notes.value.filter(note => note.id !== id);
+    showToast('Note deleted successfully');
   } catch (error) {
-    showToast('Failed to delete note', 'error')
+    showToast('Failed to delete note', 'error');
   }
-}
+};
 
 const resetForm = () => {
-  editingNote.value = null
-  newNote.value = {
-    leadId: 0,
-    content: ''
-  }
-}
+  editingNote.value = null;
+  newNote.value = { leadId: 0, content: '' };
+};
 
 const getLeadName = (leadId: number) => {
-  return leads.value.find(lead => lead.id === leadId)?.name || 'Unknown'
-}
+  return leads.value.find(lead => lead.id === leadId)?.name || 'Unknown';
+};
 
-// Fetch notes on component mount
-fetchNotes()
+// Fetch leads and notes on component mount
+onMounted(() => {
+  fetchLeadsFromLocalStorage();
+  fetchNotes();
+});
 </script>
 
 <template>
