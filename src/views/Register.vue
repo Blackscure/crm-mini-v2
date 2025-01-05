@@ -18,38 +18,46 @@ const toastMessage = ref('')
 
 // Register function to handle form submission
 const register = async () => {
-  isLoading.value = true
+  isLoading.value = true;
 
   try {
-    // Make the POST request to register the user
-    const response = await axios.post('http://127.0.0.1:8000/apps/crm-mini/api/v1/authentication/register/', {
-      email: email.value,
-      first_name: firstName.value,
-      last_name: lastName.value,
-      password: password.value
-    })
+    // Make the POST request
+    const response = await axios.post(
+      'http://127.0.0.1:8000/apps/crm-mini/api/v1/authentication/register/',
+      {
+        email: email.value,
+        first_name: firstName.value,
+        last_name: lastName.value,
+        password: password.value,
+      }
+    );
 
-    // If registration is successful, display success message and navigate to login
-    const successMessage = response.data?.message || 'Registration successful! Redirecting to login...'
+    // Log the full response for debugging
+    console.log('API Response:', response);
 
-    addToast(successMessage, 'success') // Show success toast with response message
-    setTimeout(() => {
-      router.push('/login') // Navigate to login page after 3 seconds
-    }, 3000)
+    // Extract the access_token
+    const accessToken = response.data?.data?.access_token;
+    console.log('Extracted Access Token:', accessToken);
 
-  } catch (error) {
-    // If registration fails, display error message
-    let errorMessage = 'Registration failed. Please try again.'
+    if (accessToken) {
+      // Save to localStorage
+      localStorage.setItem('access_token', accessToken);
 
-    if (error.response && error.response.data) {
-      errorMessage = error.response.data?.message || errorMessage
+      // Confirm it's saved
+      console.log('Access token saved in localStorage:', localStorage.getItem('access_token'));
+    } else {
+      console.error('Access token is missing from the response.');
     }
-
-    addToast(errorMessage, 'error') // Show error toast with response message
+  } catch (error) {
+    console.error('Registration Error:', error);
   } finally {
-    isLoading.value = false
+    isLoading.value = false;
   }
-}
+};
+
+
+
+
 
 // Toast handling
 const addToast = (message, type) => {

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { Menu, MenuButton, MenuItems, MenuItem } from '@headlessui/vue'
 import { 
   UserCircleIcon,
@@ -9,18 +9,27 @@ import {
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
+const userName = ref('')
+
+onMounted(() => {
+  const user = JSON.parse(localStorage.getItem('user') || '{}')
+  if (user && user.first_name && user.last_name) {
+    userName.value = `${user.first_name} ${user.last_name}`
+  }
+})
 
 const logout = () => {
-  // Implement logout logic here
-  router.push('/login')
-}
+  localStorage.removeItem('access_token');
+  localStorage.removeItem('user');
+  router.push('/login');
+};
 </script>
 
 <template>
   <Menu as="div" class="relative">
     <MenuButton class="flex items-center space-x-2 text-gray-700 dark:text-gray-200 hover:text-gray-900 dark:hover:text-white">
       <UserCircleIcon class="w-8 h-8" />
-      <span>John Doe</span>
+      <span>{{ userName }}</span>
     </MenuButton>
 
     <transition
