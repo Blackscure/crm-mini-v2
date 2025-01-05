@@ -11,18 +11,17 @@ interface Lead {
   created_at: string;
 }
 
-// Reactive references
-const leads = ref<Lead[]>([]); // To store leads
+const leads = ref<Lead[]>([]); 
 const newLead = ref({
   id: null,
   name: '',
   email: '',
   phone: '',
   created_by: '',
-}); // To add or edit a lead
+}); 
 const loading = ref(false); // Loading state
 
-// Pagination state
+
 const currentPage = ref(1);
 const totalPages = ref(1);
 
@@ -39,7 +38,7 @@ const formatDate = (dateString: string): string => {
   }).format(date);
 };
 
-// Function to fetch leads from the API with pagination
+
 const fetchLeads = async (page = 1) => {
   const token = localStorage.getItem('access_token');
   if (!token) {
@@ -62,8 +61,8 @@ const fetchLeads = async (page = 1) => {
     leads.value = responseData.data.data;
     currentPage.value = responseData.current_page;
     totalPages.value = responseData.pages;
+    localStorage.setItem('leads', JSON.stringify(leads.value));
 
-    console.log('Fetched leads:', leads.value);
   } catch (error) {
     console.error('Error fetching leads:', error);
     alert('Failed to fetch leads. Please check the token and API.');
@@ -72,7 +71,6 @@ const fetchLeads = async (page = 1) => {
   }
 };
 
-// Function to add or edit a lead
 const saveLead = async () => {
   const token = localStorage.getItem('access_token');
   const user = JSON.parse(localStorage.getItem('user') || '{}');
@@ -87,7 +85,6 @@ const saveLead = async () => {
   try {
     let response;
     if (newLead.value.id) {
-      // Edit existing lead (PUT request)
       response = await axios.put(
         `http://127.0.0.1:8000/apps/crm-mini/api/v1/lead/leads/${newLead.value.id}/`,
         {
@@ -104,7 +101,6 @@ const saveLead = async () => {
         }
       );
     } else {
-      // Add new lead (POST request)
       response = await axios.post(
         'http://127.0.0.1:8000/apps/crm-mini/api/v1/lead/leads/',
         {
@@ -122,7 +118,6 @@ const saveLead = async () => {
       );
     }
 
-    // Update leads list after saving
     if (newLead.value.id) {
       // Edit case
       const index = leads.value.findIndex((lead) => lead.id === newLead.value.id);
