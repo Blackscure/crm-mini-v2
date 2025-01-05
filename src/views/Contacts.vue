@@ -21,7 +21,6 @@ interface Lead {
 }
 
 const contacts = ref<Contact[]>([]);
-console.log('===================> contact', contacts)
 const newContact = ref<Contact>({
   id: 0,
   name: '',
