@@ -250,15 +250,20 @@ onMounted(() => fetchLeads());
           </table>
         </div>
         <!-- Pagination -->
-        <div class="mt-4">
-          <button @click="fetchLeads(currentPage.value - 1)" :disabled="currentPage.value === 1" class="btn btn-secondary">
-            Previous
-          </button>
-          <span class="mx-2">{{ currentPage.value }} of {{ totalPages.value }}</span>
-          <button @click="fetchLeads(currentPage.value + 1)" :disabled="currentPage.value === totalPages.value" class="btn btn-secondary">
-            Next
-          </button>
-        </div>
+       <button 
+  @click="fetchLeads(currentPage.value - 1)" 
+  :disabled="currentPage.value === 1" 
+  class="btn btn-secondary">
+  Previous
+</button>
+<span class="mx-2">{{ currentPage.value }} of {{ totalPages.value }}</span>
+<button 
+  @click="fetchLeads(currentPage.value + 1)" 
+  :disabled="currentPage.value === totalPages.value" 
+  class="btn btn-secondary">
+  Next
+</button>
+
       </div>
     </div>
   </div>
