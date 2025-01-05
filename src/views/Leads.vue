@@ -161,7 +161,7 @@ const saveLead = async () => {
 
 // Function to edit an existing lead
 const editLead = (lead: Lead) => {
-  newLead.value = { ...lead }; // Populate the form with the selected lead's data
+  newLead.value = { ...lead }; 
 };
 
 // Function to delete a lead locally
