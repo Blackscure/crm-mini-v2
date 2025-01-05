@@ -10,8 +10,12 @@ import { useRouter } from 'vue-router'
 
 const router = useRouter()
 
+// Logout function to clear token and navigate to login
 const logout = () => {
-  // Implement logout logic here
+  // Remove access_token from local storage
+  localStorage.removeItem('access_token')
+
+  // Redirect to the login page
   router.push('/login')
 }
 </script>
