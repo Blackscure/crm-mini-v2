@@ -1,19 +1,48 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import LoadingSpinner from '../components/LoadingSpinner.vue'
+
 
 const router = useRouter()
 const email = ref('')
 const password = ref('')
 const isLoading = ref(false)
+const errorMessage = ref('')
 
 const login = async () => {
   isLoading.value = true
-  // Simulate API call
-  await new Promise(resolve => setTimeout(resolve, 1000))
-  isLoading.value = false
-  router.push('/dashboard')
+  errorMessage.value = '' // Clear previous error message
+
+  try {
+    const response = await fetch('http://127.0.0.1:8000/apps/crm-mini/api/v1/authentication/login/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        email: email.value,
+        password: password.value,
+      }),
+    })
+
+    if (!response.ok) {
+      throw new Error('Failed to log in. Please check your credentials.')
+    }
+
+    const data = await response.json()
+    console.log('Login successful:', data)
+
+    // Save access token in local storage
+    localStorage.setItem('access_token', data.data.access_token)
+
+    // Navigate to the dashboard
+    router.push('/dashboard')
+  } catch (error) {
+    errorMessage.value = error.message || 'An error occurred during login.'
+    console.error('Login error:', error)
+  } finally {
+    isLoading.value = false
+  }
 }
 </script>
 
@@ -49,6 +78,10 @@ const login = async () => {
               placeholder="Password"
             />
           </div>
+        </div>
+
+        <div v-if="errorMessage" class="text-red-500 text-sm text-center">
+          {{ errorMessage }}
         </div>
 
         <div>
